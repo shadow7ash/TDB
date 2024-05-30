@@ -5,7 +5,8 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from pymongo import MongoClient, errors
 from threading import Thread
 import logging
-from urllib.parse import urlparse
+from bs4 import BeautifulSoup
+import re
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -43,14 +44,26 @@ def is_valid_terabox_link(url: str) -> bool:
     parsed_url = urlparse(url)
     return "terabox" in parsed_url.netloc
 
-def download_file(update: Update, context: CallbackContext) -> None:
-    url = update.message.text
-    if is_valid_terabox_link(url):
-        update.message.reply_text('Starting download...')
-        thread = Thread(target=download_and_send_file, args=(update, context, url))
-        thread.start()
-    else:
-        update.message.reply_text('Please provide a valid TeraBox link.')
+def extract_download_url(terabox_url: str) -> str:
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
+    response = requests.get(terabox_url, headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"Failed to access TeraBox link: {response.status_code}")
+
+    soup = BeautifulSoup(response.content, 'html.parser')
+    
+    # Hypothetical pattern to find the download link, you need to adjust this based on the actual HTML structure
+    script_tag = soup.find('script', text=re.compile('var downloadUrl'))
+    if not script_tag:
+        raise Exception("Could not find the download URL in the page source")
+    
+    download_url_match = re.search(r'var downloadUrl = "(.*?)";', script_tag.string)
+    if not download_url_match:
+        raise Exception("Could not extract the download URL from the script tag")
+    
+    download_url = download_url_match.group(1)
+    return download_url
 
 def get_file_name_from_response(response):
     content_disposition = response.headers.get('content-disposition')
@@ -60,9 +73,19 @@ def get_file_name_from_response(response):
         fname = urlparse(response.url).path.split('/')[-1]
     return fname
 
+def download_file(update: Update, context: CallbackContext) -> None:
+    url = update.message.text
+    if is_valid_terabox_link(url):
+        update.message.reply_text('Starting download...')
+        thread = Thread(target=download_and_send_file, args=(update, context, url))
+        thread.start()
+    else:
+        update.message.reply_text('Please provide a valid TeraBox link.')
+
 def download_and_send_file(update: Update, context: CallbackContext, url: str) -> None:
     try:
-        response = requests.get(url, stream=True)
+        download_url = extract_download_url(url)
+        response = requests.get(download_url, stream=True)
         if response.status_code == 200:
             file_name = get_file_name_from_response(response)
             with open(file_name, 'wb') as file:
