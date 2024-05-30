@@ -1,7 +1,7 @@
 {
   "name": "Terabox Downloader Bot",
   "description": "A Telegram bot to download files from TeraBox.",
-  "repository": "https://github.com/yourusername/your-repo",
+  "repository": "https://github.com/shadow7ash/TDB",
   "keywords": ["telegram", "bot", "terabox"],
   "env": {
     "TELEGRAM_BOT_TOKEN": {
