@@ -41,7 +41,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 def is_valid_terabox_link(url: str) -> bool:
     parsed_url = urlparse(url)
-    return parsed_url.netloc in ["1024terabox.com", "teraboxapp.com"]
+    return "terabox" in parsed_url.netloc
 
 def download_file(update: Update, context: CallbackContext) -> None:
     url = update.message.text
