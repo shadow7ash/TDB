@@ -1,0 +1,17 @@
+{
+  "name": "Terabox Downloader Bot",
+  "description": "A Telegram bot to download files from TeraBox.",
+  "repository": "https://github.com/yourusername/your-repo",
+  "keywords": ["telegram", "bot", "terabox"],
+  "env": {
+    "TELEGRAM_BOT_TOKEN": {
+      "description": "The token for your Telegram bot",
+      "required": true
+    },
+    "MONGODB_URI": {
+      "description": "MongoDB URI for storing user data",
+      "required": true
+    }
+  },
+  "addons": ["heroku-postgresql"]
+}
