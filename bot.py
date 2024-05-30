@@ -5,15 +5,16 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from pymongo import MongoClient, errors
 from threading import Thread
 import logging
-
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-MONGODB_URI = os.getenv("MONGODB_URI")
+from urllib.parse import urlparse
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
 
 logger = logging.getLogger(__name__)
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+MONGODB_URI = os.getenv("MONGODB_URI")
 
 # Initialize MongoDB client
 try:
@@ -38,18 +39,32 @@ def start(update: Update, context: CallbackContext) -> None:
         logger.error(f"Error in start handler: {e}")
         update.message.reply_text('An error occurred while processing your request.')
 
+def is_valid_terabox_link(url: str) -> bool:
+    parsed_url = urlparse(url)
+    return parsed_url.netloc in ["1024terabox.com", "teraboxapp.com"]
+
 def download_file(update: Update, context: CallbackContext) -> None:
     url = update.message.text
-    update.message.reply_text('Starting download...')
-    thread = Thread(target=download_and_send_file, args=(update, context, url))
-    thread.start()
+    if is_valid_terabox_link(url):
+        update.message.reply_text('Starting download...')
+        thread = Thread(target=download_and_send_file, args=(update, context, url))
+        thread.start()
+    else:
+        update.message.reply_text('Please provide a valid TeraBox link.')
+
+def get_file_name_from_response(response):
+    content_disposition = response.headers.get('content-disposition')
+    if content_disposition:
+        fname = content_disposition.split('filename=')[1].strip('"')
+    else:
+        fname = urlparse(response.url).path.split('/')[-1]
+    return fname
 
 def download_and_send_file(update: Update, context: CallbackContext, url: str) -> None:
     try:
         response = requests.get(url, stream=True)
-        file_name = url.split("/")[-1]
-
         if response.status_code == 200:
+            file_name = get_file_name_from_response(response)
             with open(file_name, 'wb') as file:
                 for chunk in response.iter_content(chunk_size=8192):
                     file.write(chunk)
