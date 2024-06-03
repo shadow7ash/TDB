@@ -7,6 +7,7 @@ from threading import Thread
 import logging
 from bs4 import BeautifulSoup
 import re
+from urllib.parse import urlparse
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -16,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 MONGODB_URI = os.getenv("MONGODB_URI")
+RAPIDAPI_KEY = os.getenv("RAPIDAPI_KEY")
 
 # Initialize MongoDB client
 try:
@@ -45,25 +47,23 @@ def is_valid_terabox_link(url: str) -> bool:
     return "terabox" in parsed_url.netloc
 
 def extract_download_url(terabox_url: str) -> str:
+    url = "https://terabox-downloader-direct-download-link-generator.p.rapidapi.com/fetch"
+    payload = { "url": terabox_url }
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3"}
-    response = requests.get(terabox_url, headers=headers)
-    if response.status_code != 200:
-        raise Exception(f"Failed to access TeraBox link: {response.status_code}")
+        "content-type": "application/json",
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": "terabox-downloader-direct-download-link-generator.p.rapidapi.com"
+    }
 
-    soup = BeautifulSoup(response.content, 'html.parser')
-    
-    # Hypothetical pattern to find the download link, you need to adjust this based on the actual HTML structure
-    script_tag = soup.find('script', text=re.compile('var downloadUrl'))
-    if not script_tag:
-        raise Exception("Could not find the download URL in the page source")
-    
-    download_url_match = re.search(r'var downloadUrl = "(.*?)";', script_tag.string)
-    if not download_url_match:
-        raise Exception("Could not extract the download URL from the script tag")
-    
-    download_url = download_url_match.group(1)
-    return download_url
+    response = requests.post(url, json=payload, headers=headers)
+    if response.status_code != 200:
+        raise Exception(f"Failed to fetch download URL: {response.status_code}")
+
+    data = response.json()
+    if 'error_code' in data:
+        raise Exception(f"API error: {data['error_msg']}")
+
+    return data['download_link']
 
 def get_file_name_from_response(response):
     content_disposition = response.headers.get('content-disposition')
