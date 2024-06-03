@@ -1,25 +1,28 @@
 {
-  "name": "terabox-downloader-bot",
-  "description": "Telegram bot for downloading files from TeraBox links",
-  "repository": "https://github.com/yourusername/your-repo.git",
-  "logo": "https://example.com/logo.png",
-  "keywords": ["telegram", "bot", "terabox", "downloader"],
-  "addons": [],
-  "scripts": {
-    "start": "python bot.py"
-  },
+  "name": "Terabox Downloader Bot",
+  "description": "A Telegram bot to download files from TeraBox links.",
+  "repository": "https://github.com/yourusername/yourrepository",
   "env": {
     "TELEGRAM_BOT_TOKEN": {
-      "description": "Telegram Bot API token",
+      "description": "The token for your Telegram bot",
       "required": true
     },
     "MONGODB_URI": {
-      "description": "MongoDB connection URI",
+      "description": "The URI for your MongoDB database",
       "required": true
     },
     "RAPIDAPI_KEY": {
-      "description": "RapidAPI key for accessing TeraBox API",
+      "description": "Your RapidAPI key for accessing the TeraBox API",
       "required": true
     }
-  }
+  },
+  "formation": {
+    "worker": {
+      "quantity": 1,
+      "size": "free"
+    }
+  },
+  "addons": [
+    "mongolab"
+  ]
 }
