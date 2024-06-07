@@ -4,9 +4,9 @@ import requests
 from urllib.parse import urlparse, parse_qs
 from telegram import Update
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, CallbackContext
-from pymongo import MongoClient, errors
 from threading import Thread
 import logging
+from pymongo import MongoClient
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -15,31 +15,24 @@ logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s
 logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-MONGODB_URI = os.getenv("MONGODB_URI")
 COOKIE = os.getenv("TERABOX_COOKIE")
+MONGODB_URI = os.getenv("MONGODB_URI")
 
-# Initialize MongoDB client
-try:
-    client = MongoClient(MONGODB_URI)
-    db = client.get_database("terabox_bot_db")
-    users_collection = db.get_collection("users")
-except errors.ConnectionFailure as e:
-    logger.error(f"Could not connect to MongoDB: {e}")
+# Connect to MongoDB
+client = MongoClient(MONGODB_URI)
+db = client.get_default_database()
+users_collection = db.users
 
 def start(update: Update, context: CallbackContext) -> None:
     user = update.message.from_user
-    try:
-        if not users_collection.find_one({"user_id": user.id}):
-            users_collection.insert_one({
-                "user_id": user.id,
-                "username": user.username,
-                "first_name": user.first_name,
-                "last_name": user.last_name
-            })
-        update.message.reply_text('Hi! Send me a TeraBox link and I will download it for you.')
-    except Exception as e:
-        logger.error(f"Error in start handler: {e}")
-        update.message.reply_text('An error occurred while processing your request.')
+    user_data = {
+        "_id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+    }
+    users_collection.insert_one(user_data)
+    update.message.reply_text('Hi! Send me a TeraBox link and I will download it for you.')
 
 def is_valid_terabox_link(url: str) -> bool:
     patterns = [
@@ -153,4 +146,23 @@ def download_file(update: Update, context: CallbackContext) -> None:
 def download_and_send_file(update: Update, context: CallbackContext, url: str) -> None:
     try:
         file_info = extract_download_url(url)
-        response = requests.get(file
+        response = requests.get(file_info["direct_link"], stream=True)
+        file_size = int(response.headers.get('Content-Length', 0))
+        file_name = file_info["file_name"]
+
+        with open(file_name, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        update.message.reply_document(document=open(file_name, 'rb'), filename=file_name)
+        os.remove(file_name)
+    except Exception as e:
+        logger.error(f"Error in download_and_send_file: {e}")
+        update.message.reply_text('An error occurred while processing your request.')
+
+def main() -> None:
+    updater = Updater(TOKEN)
+    dispatcher = updater.dispatcher
+
+    dispatcher.add_handler(CommandHandler("start", start))
+   
