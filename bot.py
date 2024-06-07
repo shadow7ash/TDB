@@ -112,21 +112,29 @@ def extract_download_url(terabox_url: str) -> dict:
     shorturl = extract_surl_from_url(response.url)
 
     if not shorturl:
+        logger.error("Short URL extraction failed")
         raise Exception("Short URL extraction failed")
 
     reqUrl = f"https://www.terabox.app/share/list?app_id=250528&web=1&channel=0&jsToken={jsToken}&dp-logid={logid}&page=1&num=20&by=name&order=asc&site_referer=&shorturl={shorturl}&root=1"
     response = session.get(reqUrl, headers=headers)
 
     if response.status_code != 200:
+        logger.error("Failed to get share list")
         raise Exception("Failed to get share list")
 
     data = response.json()
+    logger.debug(f"Response JSON: {data}")
+
     if data["errno"] != 0 or not data.get("list"):
+        logger.error("Error in response data or no list found")
         raise Exception("Error in response data or no list found")
 
     file_info = data["list"][0]
+    logger.debug(f"File Info: {file_info}")
+
     response = session.head(file_info["dlink"], headers=headers)
     direct_link = response.headers.get("location")
+    logger.debug(f"Direct Link: {direct_link}")
 
     return {
         "file_name": file_info["server_filename"],
