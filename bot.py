@@ -7,7 +7,6 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from pymongo import MongoClient, errors
 from threading import Thread
 import logging
-from tools import extract_surl_from_url
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -78,6 +77,12 @@ def find_between(data: str, first: str, last: str) -> str:
     except ValueError:
         return None
 
+def extract_surl_from_url(url: str) -> str:
+    parsed_url = urlparse(url)
+    query_params = parse_qs(parsed_url.query)
+    surl = query_params.get("surl", [])
+    return surl[0] if surl else None
+
 def extract_download_url(terabox_url: str) -> dict:
     session = requests.Session()
     headers = {
@@ -127,52 +132,70 @@ def extract_download_url(terabox_url: str) -> dict:
     file_info = data["list"][0]
     logger.debug(f"File Info: {file_info}")
 
-    direct_link = file_info.get("dlink")
-    if not direct_link:
-        logger.error("Direct link not found")
-        raise Exception("Direct link not found")
-
-    return {
+    response = session.head(file_info["dlink"], headers=headers)
+    direct_link = response.headers.get("location")
+    
+    file_data = {
         "file_name": file_info["server_filename"],
-        "direct_link": direct_link
+        "download_url": file_info["dlink"],
+        "direct_link": direct_link,
+        "thumbnail_url": file_info["thumbs"]["url3"],
+        "size": get_formatted_size(int(file_info["size"])),
+        "size_bytes": int(file_info["size"])
     }
 
-def download_file(update: Update, context: CallbackContext) -> None:
-    url = update.message.text
-    if is_valid_terabox_link(url):
-        update.message.reply_text('Starting download...')
-        thread = Thread(target=download_and_send_file, args=(update, context, url))
-        thread.start()
-    else:
-        update.message.reply_text('Please provide a valid TeraBox link.')
+    return file_data
 
-def download_and_send_file(update: Update, context: CallbackContext, url: str) -> None:
+def download_file(url: str, filename: str) -> None:
     try:
-        file_info = extract_download_url(url)
-        response = requests.get(file_info["direct_link"], stream=True)
-        file_size = int(response.headers.get('Content-Length', 0))
-        file_name = file_info["file_name"]
-
-        with open(file_name, 'wb') as f:
+        response = requests.get(url, stream=True)
+        response.raise_for_status()
+        with open(filename, "wb") as f:
             for chunk in response.iter_content(chunk_size=8192):
                 f.write(chunk)
-
-        update.message.reply_document(document=open(file_name, 'rb'), filename=file_name)
-        
-        # Clean up: delete the downloaded file
-        os.remove(file_name)
-
     except Exception as e:
-        logger.error(f"Error in download_and_send_file: {e}")
-        update.message.reply_text('An error occurred while processing your request.')
+        logger.error(f"Error downloading file: {e}")
+        raise
+
+def handle_terabox_link(update: Update, context: CallbackContext) -> None:
+    url = update.message.text.strip()
+    if not is_valid_terabox_link(url):
+        update.message.reply_text("Invalid TeraBox link. Please provide a valid TeraBox link.")
+        return
+
+    try:
+        file_info = extract_download_url(url)
+        if not file_info:
+            update.message.reply_text("Failed to extract download information from the provided link.")
+            return
+
+        thumbnail_url = file_info.get("thumbnail_url")
+        size = file_info.get("size")
+        direct_link = file_info.get("direct_link")
+
+        update.message.reply_text(f"Downloading: {file_info['file_name']}\nSize: {size}")
+        
+        # Start downloading the file in a separate thread
+        Thread(target=download_file, args=(direct_link, f"{file_info['file_name']}")).start()
+
+        # Send the thumbnail
+        if thumbnail_url:
+            update.message.reply_photo(photo=thumbnail_url)
+
+        update.message.reply_text("Download started successfully.")
+    except Exception as e:
+        logger.error(f"Error handling TeraBox link: {e}")
+        update.message.reply_text("An error occurred while processing your request.")
 
 def main() -> None:
     updater = Updater(TOKEN)
     dispatcher = updater.dispatcher
 
+    # Register handlers
     dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, download_file))
+    dispatcher.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_terabox_link))
 
+    # Start the Bot
     updater.start_polling()
     updater.idle()
 
