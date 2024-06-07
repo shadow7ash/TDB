@@ -1,5 +1,11 @@
-python-telegram-bot==13.7
+python-telegram-bot
 requests
 pymongo[srv]
 dnspython
 beautifulsoup4
+six==1.16.0
+telegram==0.0.1
+urllib3==1.26.6
+certifi==2021.5.30
+chardet==4.0.0
+idna==2.10
