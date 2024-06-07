@@ -5,10 +5,10 @@ setup(
     version='1.0',
     packages=find_packages(),
     install_requires=[
-        'python-telegram-bot==13.7',
-        'requests==2.25.1',
-        'pymongo[srv]==3.11.4'
-        'dnspython==2.1.0'
+        'python-telegram-bot',
+        'requests',
+        'pymongo[srv]'
+        'dnspython'
         'beautifulsoup4'
     ],
 )
