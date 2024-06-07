@@ -5,6 +5,8 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from pymongo import MongoClient, errors
 from threading import Thread
 import logging
+from bs4 import BeautifulSoup
+import re
 from urllib.parse import urlparse
 
 # Setup logging
@@ -42,7 +44,7 @@ def start(update: Update, context: CallbackContext) -> None:
 
 def is_valid_terabox_link(url: str) -> bool:
     parsed_url = urlparse(url)
-    return any(domain in parsed_url.netloc for domain in ["1024terabox.com", "teraboxapp.com", "freeterabox.com"])
+    return "terabox" in parsed_url.netloc
 
 def extract_download_url(terabox_url: str) -> str:
     url = "https://terabox-downloader-direct-download-link-generator.p.rapidapi.com/fetch"
@@ -97,7 +99,7 @@ def download_and_send_file(update: Update, context: CallbackContext, url: str) -
             update.message.reply_text('Failed to download the file.')
     except Exception as e:
         logger.error(f"Error in download_and_send_file: {e}")
-        update.message.reply_text(f'An error occurred while downloading the file: {e}')
+        update.message.reply_text('An error occurred while downloading the file.')
 
 def main():
     updater = Updater(TOKEN, use_context=True)
