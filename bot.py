@@ -7,6 +7,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from pymongo import MongoClient, errors
 from threading import Thread
 import logging
+from tools import extract_surl_from_url
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -77,12 +78,6 @@ def find_between(data: str, first: str, last: str) -> str:
     except ValueError:
         return None
 
-def extract_surl_from_url(url: str) -> str:
-    parsed_url = urlparse(url)
-    query_params = parse_qs(parsed_url.query)
-    surl = query_params.get("surl", [])
-    return surl[0] if surl else None
-
 def extract_download_url(terabox_url: str) -> dict:
     session = requests.Session()
     headers = {
@@ -132,9 +127,10 @@ def extract_download_url(terabox_url: str) -> dict:
     file_info = data["list"][0]
     logger.debug(f"File Info: {file_info}")
 
-    response = session.head(file_info["dlink"], headers=headers)
-    direct_link = response.headers.get("location")
-    logger.debug(f"Direct Link: {direct_link}")
+    direct_link = file_info.get("dlink")
+    if not direct_link:
+        logger.error("Direct link not found")
+        raise Exception("Direct link not found")
 
     return {
         "file_name": file_info["server_filename"],
@@ -162,7 +158,10 @@ def download_and_send_file(update: Update, context: CallbackContext, url: str) -
                 f.write(chunk)
 
         update.message.reply_document(document=open(file_name, 'rb'), filename=file_name)
+        
+        # Clean up: delete the downloaded file
         os.remove(file_name)
+
     except Exception as e:
         logger.error(f"Error in download_and_send_file: {e}")
         update.message.reply_text('An error occurred while processing your request.')
