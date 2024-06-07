@@ -188,6 +188,9 @@ def handle_terabox_link(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("An error occurred while processing your request.")
 
 def main() -> None:
+    if TOKEN is None:
+        logger.error("Telegram Bot Token not found. Please set the TELEGRAM_BOT_TOKEN environment variable.")
+        return
     updater = Updater(TOKEN)
     dispatcher = updater.dispatcher
 
