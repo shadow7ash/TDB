@@ -7,6 +7,7 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, Callb
 from pymongo import MongoClient, errors
 from threading import Thread
 import logging
+from tools import get_formatted_size
 
 # Setup logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -134,7 +135,11 @@ def extract_download_url(terabox_url: str) -> dict:
 
     response = session.head(file_info["dlink"], headers=headers)
     direct_link = response.headers.get("location")
-    
+
+    if not direct_link:
+        logger.error("Direct link extraction failed")
+        raise Exception("Direct link extraction failed")
+
     file_data = {
         "file_name": file_info["server_filename"],
         "download_url": file_info["dlink"],
@@ -188,9 +193,6 @@ def handle_terabox_link(update: Update, context: CallbackContext) -> None:
         update.message.reply_text("An error occurred while processing your request.")
 
 def main() -> None:
-    if TOKEN is None:
-        logger.error("Telegram Bot Token not found. Please set the TELEGRAM_BOT_TOKEN environment variable.")
-        return
     updater = Updater(TOKEN)
     dispatcher = updater.dispatcher
 
